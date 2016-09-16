@@ -9,6 +9,7 @@ import (
 	"github.com/iguazio/kibini/logger"
 	"io"
 	"sync"
+	"time"
 )
 
 // whether to include matched services or exclude them
@@ -54,7 +55,7 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	}
 
 	// create log writers - for each input file name, a list of writers will be provided
-	logWritersByLogFileName, err := k.createLogWriters(inputPath,
+	logWritersByLogFileName, writerWaitGroup, err := k.createLogWriters(inputPath,
 		inputFileNames,
 		outputPath,
 		outputMode,
@@ -78,7 +79,7 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	for inputFilePath, fileLogReader := range k.readers {
 		k.logger.With(logging.Fields{
 			"inputFilePath": inputFilePath,
-			"logReader": fileLogReader,
+			"logReader":     fileLogReader,
 		}).Debug("Starting to read")
 
 		readerWaitGroup.Add(1)
@@ -94,10 +95,9 @@ func (k *Kibini) ProcessLogs(inputPath string,
 		}(fileLogReader)
 	}
 
-	// wait for all reads to complete
+	// wait for all reads and writes to complete
 	readerWaitGroup.Wait()
-
-	k.logger.Debug("Done")
+	writerWaitGroup.Wait()
 
 	return nil
 }
@@ -179,37 +179,63 @@ func (k *Kibini) createLogWriters(inputPath string,
 	inputFileNames []string,
 	outputPath string,
 	outputMode OutputMode,
-	outputStdout bool) (logWriters map[string][]*logWriter, err error) {
+	outputStdout bool) (logWriters map[string][]logWriter, writerWaitGroup *sync.WaitGroup, err error) {
 
-	logWriters = map[string][]*logWriter{}
+	var outputFileWriter io.Writer
+	writerWaitGroup = new(sync.WaitGroup)
+	logWriters = map[string][]logWriter{}
 
 	if outputMode == OutputModePer {
 
 		// create a formatter/writer per file
 		for _, inputFileName := range inputFileNames {
-			outputFileWriter, err := k.createOutputFileWriter(inputFileName, outputPath)
+			outputFilePath := filepath.Join(outputPath, inputFileName+".fmt")
+
+			outputFileWriter, err = k.createOutputFileWriter(outputFilePath)
 			if err != nil {
-				return nil, k.logger.With(logging.Fields{
-					"inputFileName": inputFileName,
+				err = k.logger.With(logging.Fields{
+					"outputFilePath": outputFilePath,
 				}).Report(err, "Failed to create output file writer")
+				return
 			}
 
 			// create a single formatter/writer for this input file
 			humanReadableFormatter := newHumanReadableFormatter(false)
-			logWriters[inputFileName] = []*logWriter{
-				newLogWriter(k.logger, humanReadableFormatter, outputFileWriter),
+			logWriters[inputFileName] = []logWriter{
+				newLogFormattedWriter(k.logger, humanReadableFormatter, outputFileWriter),
 			}
+		}
+	} else if outputMode == OutputModeSingle {
+
+		// create an output file writer
+		outputFileWriter, err = k.createOutputFileWriter(outputPath)
+		if err != nil {
+			err = k.logger.With(logging.Fields{
+				"outputPath": outputPath,
+			}).Report(err, "Failed to create output file writer")
+			return
+		}
+
+		// create a single formatter/writer which will receive the sorted log records from the merger
+		writer := newLogFormattedWriter(k.logger,
+			newHumanReadableFormatter(false),
+			outputFileWriter)
+
+		// create a log merger writer that will receive all records, merge them (sorted) and then output
+		// them to log writer
+		logMerger := newLogMerger(k.logger, writerWaitGroup, true, time.Second, writer)
+
+		// set the log merger as the writer for all input files
+		for _, inputFileName := range inputFileNames {
+			logWriters[inputFileName] = []logWriter{logMerger}
 		}
 	}
 
 	return
 }
 
-func (k *Kibini) createOutputFileWriter(inputFileName string, outputPath string) (io.Writer, error) {
+func (k *Kibini) createOutputFileWriter(outputFilePath string) (io.Writer, error) {
 	var err error
-
-	// get the output file name
-	outputFilePath := filepath.Join(outputPath, inputFileName+".fmt")
 
 	// create output file
 	outputFile, err := os.OpenFile(outputFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)

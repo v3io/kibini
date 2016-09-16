@@ -12,17 +12,17 @@ import (
 type logTailReader struct {
 	logger        logging.Logger
 	inputFilePath string
-	logWriters    []*logWriter
+	logWriters    []logWriter
 }
 
 func newLogTailReader(logger logging.Logger,
 	inputFilePath string,
-	logWriters []*logWriter) *logTailReader {
+	logWriters []logWriter) *logTailReader {
 
 	r := &logTailReader{
-		logger: logger.GetChild("tail_reader").GetChild(filepath.Base(inputFilePath)),
+		logger:        logger.GetChild("tail_reader").GetChild(filepath.Base(inputFilePath)),
 		inputFilePath: inputFilePath,
-		logWriters: logWriters,
+		logWriters:    logWriters,
 	}
 
 	r.logger.Debug("Created")
@@ -30,19 +30,19 @@ func newLogTailReader(logger logging.Logger,
 	return r
 }
 
-func (r *logTailReader) read(follow bool) error {
+func (ltr *logTailReader) read(follow bool) error {
 	tailConfig := tail.Config{}
 	tailConfig.Location = &tail.SeekInfo{0, os.SEEK_SET}
 	tailConfig.Follow = follow
 	tailConfig.Logger = tail.DiscardingLogger
 
 	// start tailing the input file
-	t, err := tail.TailFile(r.inputFilePath, tailConfig)
+	t, err := tail.TailFile(ltr.inputFilePath, tailConfig)
 	if err != nil {
-		return r.logger.Report(err, "Failed to tail file")
+		return ltr.logger.Report(err, "Failed to tail file")
 	}
 
-	r.logger.Debug("Tailing")
+	ltr.logger.Debug("Tailing")
 
 	// for each line in the file (both existing and newly added)
 	for line := range t.Lines {
@@ -51,7 +51,7 @@ func (r *logTailReader) read(follow bool) error {
 		if logRecord := newLogRecord(line.Text); logRecord != nil {
 
 			// iterate over all writers and write this record
-			for _, logWriter := range r.logWriters {
+			for _, logWriter := range ltr.logWriters {
 				logWriter.Write(logRecord)
 			}
 		}

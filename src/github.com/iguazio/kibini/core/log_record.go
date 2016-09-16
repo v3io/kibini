@@ -7,12 +7,13 @@ import (
 )
 
 type logRecord struct {
-	WhenRaw  string `json:"when"`
-	When     time.Time
-	Who      string `json:"who"`
-	What     string `json:"what"`
-	Severity string `json:"severity"`
-	More     string `json:"more"`
+	WhenRaw      string `json:"when"`
+	When         time.Time
+	WhenUnixNano int64
+	Who          string `json:"who"`
+	What         string `json:"what"`
+	Severity     string `json:"severity"`
+	More         string `json:"more"`
 }
 
 func newLogRecord(unparsedLogRecord string) *logRecord {
@@ -28,6 +29,9 @@ func newLogRecord(unparsedLogRecord string) *logRecord {
 	if err != nil {
 		return nil
 	}
+
+	// populate unix nano field
+	logRecord.WhenUnixNano = logRecord.When.UnixNano()
 
 	return &logRecord
 }

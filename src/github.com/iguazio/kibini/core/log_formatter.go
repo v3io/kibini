@@ -21,11 +21,11 @@ func newHumanReadableFormatter(color bool) *humanReadableFormatter {
 	}
 }
 
-func (f *humanReadableFormatter) Format(logRecord *logRecord) string {
+func (hrf *humanReadableFormatter) Format(logRecord *logRecord) string {
 	var formatted string
 	severityCode := logRecord.Severity[0]
 
-	if !f.color {
+	if !hrf.color {
 		formatted = fmt.Sprintf("%s %30s (%c) %s ",
 			logRecord.When.Format("020106 15:04:05.000000"),
 			logRecord.rtruncateString(logRecord.Who, 30),
