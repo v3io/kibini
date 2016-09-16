@@ -1,12 +1,14 @@
 package core
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
-	"fmt"
 	"regexp"
 
 	"github.com/iguazio/kibini/logger"
-	"errors"
+	"io"
+	"sync"
 )
 
 // whether to include matched services or exclude them
@@ -17,38 +19,82 @@ const (
 	serviceFilterExclude
 )
 
+type OutputMode int
+const (
+	OutputModeSingle OutputMode = iota
+	OutputModePer
+)
+
 type Kibini struct {
-	logger   logging.Logger
+	logger  logging.Logger
+	readers map[string]logReader
 }
 
 func NewKibini(logger logging.Logger) *Kibini {
 	return &Kibini{
 		logger,
+		map[string]logReader{},
 	}
 }
 
-func (k *Kibini) ProcessLogs(logDir string,
-	formattedLogDir string,
+func (k *Kibini) ProcessLogs(inputPath string,
+	inputFollow bool,
+	outputPath string,
+	outputMode OutputMode,
+	outputStdout bool,
 	services string,
-	noServices string) error {
+	noServices string) (err error) {
 
 	// get the log file names on which we shall work
-	logFilePaths, err := k.getSourceLogFileNames(logDir, services, noServices)
+	inputFileNames, err := k.getSourceLogFileNames(inputPath, services, noServices)
 	if err != nil {
 		k.logger.Report(err, "Failed to get filtered log file names")
 	}
 
-	// create a log processor
-	for _, logFilePath := range logFilePaths {
-		logFileProcessor := newLogProcessor(k.logger, filepath.Join(logDir, logFilePath), nil)
-		fmt.Println(logFileProcessor.inputFilePath)
+	// create log writers - for each input file name, a list of writers will be provided
+	logWritersByLogFileName, err := k.createLogWriters(inputPath,
+		inputFileNames,
+		outputPath,
+		outputMode,
+		outputStdout)
+	if err != nil {
+		k.logger.Report(err, "Failed to create log writers")
 	}
+
+	// create a log processor
+	for _, inputFileName := range inputFileNames {
+		inputFilePath := filepath.Join(inputPath, inputFileName)
+
+		k.readers[inputFilePath] = newLogTailReader(k.logger,
+			inputFilePath,
+			logWritersByLogFileName[inputFileName])
+	}
+
+	var readerWaitGroup sync.WaitGroup
+
+	// tell all log readers to start reading
+	for _, logReader := range k.readers {
+		readerWaitGroup.Add(1)
+
+		// do the read in a go routine which upon completion signals the wait group
+		go func() {
+
+			// tell the reader to read - if it tails it might never stop
+			logReader.read(inputFollow)
+
+			// this specific reader is done
+			readerWaitGroup.Done()
+		}()
+	}
+
+	// wait for all reads to complete
+	readerWaitGroup.Wait()
 
 	//
 	return nil
 }
 
-func (k *Kibini) getSourceLogFileNames(logDir string,
+func (k *Kibini) getSourceLogFileNames(inputPath string,
 	services string,
 	noServices string) ([]string, error) {
 	var filteredLogFileNames []string
@@ -56,7 +102,7 @@ func (k *Kibini) getSourceLogFileNames(logDir string,
 	var err error
 
 	// get all log files in log directory
-	unfilteredLogFileNames, err = filepath.Glob(filepath.Join(logDir, "*.log"))
+	unfilteredLogFileNames, err = filepath.Glob(filepath.Join(inputPath, "*.log"))
 	if err != nil {
 		return nil, k.logger.Report(err, "Failed to list log directory")
 	}
@@ -114,9 +160,60 @@ func (k *Kibini) compileServiceFilter(services string,
 
 	k.logger.With(logging.Fields{
 		"filterType": filterType,
-		"filter": filter,
+		"filter":     filter,
 	}).Debug("Compiling service filter")
 
 	compiledFilter, err = regexp.Compile(filter)
 	return
+}
+
+func (k *Kibini) createLogWriters(inputPath string,
+	inputFileNames []string,
+	outputPath string,
+	outputMode OutputMode,
+	outputStdout bool) (logWriters map[string][]*logWriter, err error) {
+
+	logWriters = map[string][]*logWriter{}
+
+	if outputMode == OutputModePer {
+
+		// create a formatter/writer per file
+		for _, inputFileName := range inputFileNames {
+			outputFileWriter, err := k.createOutputFileWriter(inputFileName, outputPath)
+			if err != nil {
+				return nil, k.logger.With(logging.Fields{
+					"inputFileName": inputFileName,
+				}).Report(err, "Failed to create output file writer")
+			}
+
+			// create a single formatter/writer for this input file
+			humanReadableFormatter := newHumanReadableFormatter(false)
+			logWriters[inputFileName] = []*logWriter{
+				newLogWriter(k.logger, humanReadableFormatter, outputFileWriter),
+			}
+		}
+	}
+
+	return
+}
+
+func (k *Kibini) createOutputFileWriter(inputFileName string, outputPath string) (io.Writer, error) {
+	var err error
+
+	// get the output file name
+	outputFilePath := filepath.Join(outputPath, inputFileName + ".fmt")
+
+	// create output file
+	outputFile, err := os.OpenFile(outputFilePath, os.O_WRONLY | os.O_CREATE | os.O_TRUNC, 0755)
+	if err != nil {
+		return nil, k.logger.With(logging.Fields{
+			"outputFilePath": outputFilePath,
+		}).Report(err, "Failed to open output file")
+	}
+
+	k.logger.With(logging.Fields{
+		"outputFilePath": outputFilePath,
+	}).Debug("Created output file writer")
+
+	return outputFile, nil
 }
