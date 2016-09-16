@@ -33,7 +33,7 @@ func newFileEntry(dirPath string, fileName string) (*logrus.Entry, error) {
 func createNewStdoutEntry() *logrus.Entry {
 	logger := logrus.New()
 	logger.Out = os.Stdout
-	logger.Formatter = &textFormatter{ForceColors: true}
+	logger.Formatter = &textFormatter{}
 
 	return logrus.NewEntry(logger)
 }

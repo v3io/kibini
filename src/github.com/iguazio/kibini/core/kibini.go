@@ -212,7 +212,7 @@ func (k *Kibini) createOutputFileWriter(inputFileName string, outputPath string)
 	outputFilePath := filepath.Join(outputPath, inputFileName+".fmt")
 
 	// create output file
-	outputFile, err := os.OpenFile(outputFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	outputFile, err := os.OpenFile(outputFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, k.logger.With(logging.Fields{
 			"outputFilePath": outputFilePath,

@@ -3,10 +3,7 @@ package logging
 import (
 	"bytes"
 	"fmt"
-	"runtime"
-	"sort"
 	"strings"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/mgutz/ansi"
@@ -14,178 +11,78 @@ import (
 
 const reset = ansi.Reset
 
-var (
-	baseTimestamp time.Time
-	isTerminal    bool
-)
+// Stdout timestamp (Identical to python)
+const textDefaultTimestampFormat = "02.01.06 15:04:05.000000"
 
-func init() {
-	baseTimestamp = time.Now()
-	isTerminal = logrus.IsTerminal()
-}
-
-func miniTS() int {
-	return int(time.Since(baseTimestamp) / time.Second)
-}
-
-type textFormatter struct {
-	// Set to true to bypass checking for a TTY before outputting colors.
-	ForceColors bool
-
-	// Force disabling colors.
-	DisableColors bool
-
-	// Disable timestamp logging. useful when output is redirected to logging
-	// system that already adds timestamps.
-	DisableTimestamp bool
-
-	// Enable logging of just the time passed since beginning of execution.
-	ShortTimestamp bool
-
-	// Timestamp format to use for display when a full timestamp is printed.
-	TimestampFormat string
-
-	// The fields are sorted by default for a consistent output. For applications
-	// that log extremely frequently and don't use the JSON formatter this may not
-	// be desired.
-	DisableSorting bool
-}
+type textFormatter struct{}
 
 func (f *textFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	var keys []string = make([]string, 0, len(entry.Data))
-	for k := range entry.Data {
-		if k != "who" {
-			keys = append(keys, k)
-		}
-	}
-
-	if !f.DisableSorting {
-		sort.Strings(keys)
-	}
-
 	b := &bytes.Buffer{}
-
-	prefixFieldClashes(entry.Data)
-
-	isColorTerminal := isTerminal && (runtime.GOOS != "windows")
-	isColored := (f.ForceColors || isColorTerminal) && !f.DisableColors
-
-	timestampFormat := f.TimestampFormat
-	if timestampFormat == "" {
-		timestampFormat = time.Stamp
-	}
-	if isColored {
-		f.printColored(b, entry, keys, timestampFormat)
-	} else {
-		if !f.DisableTimestamp {
-			f.appendKeyValue(b, "time", entry.Time.Format(timestampFormat))
-		}
-		f.appendKeyValue(b, "level", entry.Level.String())
-		if entry.Message != "" {
-			f.appendKeyValue(b, "msg", entry.Message)
-		}
-		for _, key := range keys {
-			f.appendKeyValue(b, key, entry.Data[key])
-		}
-	}
-
+	f.printColored(b, entry)
 	b.WriteByte('\n')
 	return b.Bytes(), nil
 }
 
-func (f *textFormatter) printColored(b *bytes.Buffer, entry *logrus.Entry, keys []string, timestampFormat string) {
-	var levelColor string
-	var levelText string
-	switch entry.Level {
+func (f *textFormatter) printColored(b *bytes.Buffer, entry *logrus.Entry) {
+	severityColor := getSeverityColor(entry.Level)
+	severity := getSeverityShortcut(entry.Level)
+	formattedWho := getFormattedWho(entry.Data)
+
+	fmt.Fprintf(b, "%s%s%s %s%s%s: %s(%+s)%s %s",
+		ansi.LightBlack, entry.Time.Format(textDefaultTimestampFormat), reset,
+		ansi.Cyan, formattedWho, reset,
+		severityColor, severity, reset,
+		entry.Message)
+
+	additionalInfo := make([]string, 0, len(entry.Data)-1)
+	for k := range entry.Data {
+		if k != "who" {
+			keyValue := fmt.Sprintf("%s%s%s=%+v", severityColor, k, reset, entry.Data[k])
+			additionalInfo = append(additionalInfo, keyValue)
+		}
+	}
+
+	formattedAdditionalInfo := strings.Join(additionalInfo, ", ")
+
+	if len(formattedAdditionalInfo) > 0 {
+		openBracket := fmt.Sprint(ansi.Cyan, fmt.Sprintf(" {%s", reset))
+		closeBracket := fmt.Sprint(ansi.Cyan, "}")
+		fmt.Fprint(b, openBracket, formattedAdditionalInfo, closeBracket)
+	}
+}
+
+func getFormattedWho(data logrus.Fields) string {
+	who, ok := data["who"]
+	if ok {
+		whoStr := fmt.Sprintf("%30s", who)
+		return fmt.Sprintf("%30s", whoStr[len(whoStr)-30:])
+	}
+
+	return ""
+}
+
+func getSeverityColor(l logrus.Level) string {
+	switch l {
 	case logrus.InfoLevel:
-		levelColor = ansi.Green
+		return ansi.Green
 	case logrus.WarnLevel:
-		levelColor = ansi.Yellow
-	case logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel:
-		levelColor = ansi.Red
-	default:
-		levelColor = ansi.Blue
+		return ansi.Yellow
+	case logrus.ErrorLevel:
+		return ansi.Red
 	}
 
-	if entry.Level != logrus.WarnLevel {
-		levelText = strings.ToUpper(entry.Level.String())
-	} else {
-		levelText = "WARN"
-	}
-
-	prefix := ""
-	prefixValue, ok := entry.Data["who"]
-	if ok {
-		prefix = fmt.Sprint(" ", ansi.Cyan, fmt.Sprintf("%40s", prefixValue), ":", reset)
-	}
-
-	if f.ShortTimestamp {
-		fmt.Fprintf(b, "%s[%04d]%s %s%+5s%s%s %s", ansi.LightBlack, miniTS(), reset, levelColor, levelText, reset, prefix, entry.Message)
-	} else {
-		fmt.Fprintf(b, "%s[%s]%s %s%+5s%s%s %s", ansi.LightBlack, entry.Time.Format(timestampFormat), reset, levelColor, levelText, reset, prefix, entry.Message)
-	}
-
-	if len(keys) > 0 {
-		fmt.Fprint(b, " ", fmt.Sprint(ansi.Cyan, "{", reset))
-		for i, k := range keys {
-			v := entry.Data[k]
-			fmt.Fprintf(b, "%s%s%s=%+v", levelColor, k, reset, v)
-			if i < len(keys)-1 {
-				fmt.Fprint(b, ", ")
-			}
-		}
-		fmt.Fprint(b, fmt.Sprint(ansi.Cyan, "}", reset))
-	}
+	return ansi.Blue
 }
 
-func needsQuoting(text string) bool {
-	for _, ch := range text {
-		if !((ch >= 'a' && ch <= 'z') ||
-			(ch >= 'A' && ch <= 'Z') ||
-			(ch >= '0' && ch <= '9') ||
-			ch == '-' || ch == '.') {
-			return false
-		}
-	}
-	return true
-}
-
-func (f *textFormatter) appendKeyValue(b *bytes.Buffer, key string, value interface{}) {
-	b.WriteString(key)
-	b.WriteByte('=')
-
-	switch value := value.(type) {
-	case string:
-		if needsQuoting(value) {
-			b.WriteString(value)
-		} else {
-			fmt.Fprintf(b, "%q", value)
-		}
-	case error:
-		errmsg := value.Error()
-		if needsQuoting(errmsg) {
-			b.WriteString(errmsg)
-		} else {
-			fmt.Fprintf(b, "%q", value)
-		}
-	default:
-		fmt.Fprint(b, value)
+func getSeverityShortcut(l logrus.Level) string {
+	switch l {
+	case logrus.InfoLevel:
+		return "I"
+	case logrus.WarnLevel:
+		return "W"
+	case logrus.DebugLevel:
+		return "D"
 	}
 
-	b.WriteByte(' ')
-}
-
-func prefixFieldClashes(data logrus.Fields) {
-	_, ok := data["time"]
-	if ok {
-		data["fields.time"] = data["time"]
-	}
-	_, ok = data["msg"]
-	if ok {
-		data["fields.msg"] = data["msg"]
-	}
-	_, ok = data["level"]
-	if ok {
-		data["fields.level"] = data["level"]
-	}
+	return "E"
 }
