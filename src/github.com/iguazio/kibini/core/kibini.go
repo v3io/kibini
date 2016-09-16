@@ -13,6 +13,7 @@ import (
 
 // whether to include matched services or exclude them
 type serviceFilterType int
+
 const (
 	serviceFilterNone serviceFilterType = iota
 	serviceFilterInclude
@@ -20,6 +21,7 @@ const (
 )
 
 type OutputMode int
+
 const (
 	OutputModeSingle OutputMode = iota
 	OutputModePer
@@ -73,24 +75,30 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	var readerWaitGroup sync.WaitGroup
 
 	// tell all log readers to start reading
-	for _, logReader := range k.readers {
+	for inputFilePath, fileLogReader := range k.readers {
+		k.logger.With(logging.Fields{
+			"inputFilePath": inputFilePath,
+			"logReader": fileLogReader,
+		}).Debug("Starting to read")
+
 		readerWaitGroup.Add(1)
 
 		// do the read in a go routine which upon completion signals the wait group
-		go func() {
+		go func(reader logReader) {
 
 			// tell the reader to read - if it tails it might never stop
-			logReader.read(inputFollow)
+			reader.read(inputFollow)
 
 			// this specific reader is done
 			readerWaitGroup.Done()
-		}()
+		}(fileLogReader)
 	}
 
 	// wait for all reads to complete
 	readerWaitGroup.Wait()
 
-	//
+	k.logger.Debug("Done")
+
 	return nil
 }
 
@@ -201,10 +209,10 @@ func (k *Kibini) createOutputFileWriter(inputFileName string, outputPath string)
 	var err error
 
 	// get the output file name
-	outputFilePath := filepath.Join(outputPath, inputFileName + ".fmt")
+	outputFilePath := filepath.Join(outputPath, inputFileName+".fmt")
 
 	// create output file
-	outputFile, err := os.OpenFile(outputFilePath, os.O_WRONLY | os.O_CREATE | os.O_TRUNC, 0755)
+	outputFile, err := os.OpenFile(outputFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		return nil, k.logger.With(logging.Fields{
 			"outputFilePath": outputFilePath,

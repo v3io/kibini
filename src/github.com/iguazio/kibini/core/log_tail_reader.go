@@ -6,6 +6,7 @@ import (
 	"github.com/hpcloud/tail"
 
 	"github.com/iguazio/kibini/logger"
+	"path/filepath"
 )
 
 type logTailReader struct {
@@ -19,12 +20,12 @@ func newLogTailReader(logger logging.Logger,
 	logWriters []*logWriter) *logTailReader {
 
 	r := &logTailReader{
-		logger.GetChild("processor"),
-		inputFilePath,
-		logWriters,
+		logger: logger.GetChild("tail_reader").GetChild(filepath.Base(inputFilePath)),
+		inputFilePath: inputFilePath,
+		logWriters: logWriters,
 	}
 
-	r.logger.Debug("Created processor")
+	r.logger.Debug("Created")
 
 	return r
 }
@@ -40,6 +41,8 @@ func (r *logTailReader) read(follow bool) error {
 	if err != nil {
 		return r.logger.Report(err, "Failed to tail file")
 	}
+
+	r.logger.Debug("Tailing")
 
 	// for each line in the file (both existing and newly added)
 	for line := range t.Lines {
