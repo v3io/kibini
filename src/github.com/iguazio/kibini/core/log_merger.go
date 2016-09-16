@@ -28,7 +28,7 @@ type logMerger struct {
 	waitGroup                   *sync.WaitGroup
 	stopAfterFirstFlush         bool
 	inactivityFlushTimeout      time.Duration
-	writer                      logWriter
+	writers                     []logWriter
 	incomingRecords             chan *logRecord
 	pendingRecords              logRecordSorter
 	lastPendingRecordReceivedAt time.Time
@@ -38,14 +38,14 @@ func newLogMerger(logger logging.Logger,
 	waitGroup *sync.WaitGroup,
 	stopAfterFirstFlush bool,
 	inactivityFlushTimeout time.Duration,
-	writer logWriter) *logMerger {
+	writers []logWriter) *logMerger {
 
 	lm := &logMerger{
 		logger:                      logger.GetChild("merger"),
 		waitGroup:                   waitGroup,
 		stopAfterFirstFlush:         stopAfterFirstFlush,
 		inactivityFlushTimeout:      inactivityFlushTimeout,
-		writer:                      writer,
+		writers:                     writers,
 		incomingRecords:             make(chan *logRecord),
 		pendingRecords:              logRecordSorter{},
 		lastPendingRecordReceivedAt: time.Now(),
@@ -116,9 +116,11 @@ func (lm *logMerger) flushPendingRecords() {
 	// start by sorting the pending records by time
 	sort.Sort(lm.pendingRecords)
 
-	// now flush them towards the writer
+	// now flush them towards the writers
 	for _, logRecord := range lm.pendingRecords {
-		lm.writer.Write(logRecord)
+		for _, writer := range lm.writers {
+			writer.Write(logRecord)
+		}
 	}
 
 	// clean out the pending records

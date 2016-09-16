@@ -216,14 +216,32 @@ func (k *Kibini) createLogWriters(inputPath string,
 			return
 		}
 
-		// create a single formatter/writer which will receive the sorted log records from the merger
-		writer := newLogFormattedWriter(k.logger,
+		// create a formatter/writer which will receive the sorted log records from the merger
+		fileWriter := newLogFormattedWriter(k.logger,
 			newHumanReadableFormatter(false),
 			outputFileWriter)
 
+		// shove file writer to writers
+		writers := []logWriter{
+			fileWriter,
+		}
+
+		// if stdout is requested, create a writer for it
+		if outputStdout {
+			stdoutWriter := newLogFormattedWriter(k.logger,
+				newHumanReadableFormatter(true),
+				os.Stdout)
+
+			writers = append(writers, stdoutWriter)
+		}
+
 		// create a log merger writer that will receive all records, merge them (sorted) and then output
 		// them to log writer
-		logMerger := newLogMerger(k.logger, writerWaitGroup, true, time.Second, writer)
+		logMerger := newLogMerger(k.logger,
+			writerWaitGroup,
+			true,
+			time.Second,
+			writers)
 
 		// set the log merger as the writer for all input files
 		for _, inputFileName := range inputFileNames {
