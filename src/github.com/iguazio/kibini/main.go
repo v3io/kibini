@@ -7,6 +7,7 @@ import (
 
 	"github.com/iguazio/kibini/core"
 	"github.com/iguazio/kibini/logger"
+	"path/filepath"
 )
 
 var (
@@ -30,9 +31,21 @@ func getOutputMode(outputModeString string) core.OutputMode {
 
 func augmentArguments() {
 
-	// if user didn't pass output path, take input path
-	if *appOutputPath == "" {
+	// if stdout is set, enforce single mode since stdout doesn't make sense we you do "per"
+	if *appOutputStdout {
+		*appOutputMode = "single"
+	}
+
+	// if user didn't pass output path and stdout is disabled, take input path
+	// and shove into output path
+	if *appOutputPath == "" && !*appOutputStdout {
 		*appOutputPath = *appInputPath
+
+		// if output mode is single - add a default merged name because path needs
+		// to contain a file name and input path is always a dir
+		if *appOutputMode == "single" {
+			*appOutputPath = filepath.Join(*appOutputPath, "merged.log.fmt")
+		}
 	}
 }
 
@@ -40,7 +53,7 @@ func main() {
 	app.Version("v0.0.1")
 
 	// create a logger
-	logger := logging.NewClient("kibini", ".", "kibini.log", false)
+	logger := logging.NewClient("kibini", ".", "kibini.log.txt", true)
 
 	if *appQuiet {
 		logger.SetLevel(logging.Error)

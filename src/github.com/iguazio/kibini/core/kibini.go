@@ -57,6 +57,7 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	// create log writers - for each input file name, a list of writers will be provided
 	logWritersByLogFileName, writerWaitGroup, err := k.createLogWriters(inputPath,
 		inputFileNames,
+		inputFollow,
 		outputPath,
 		outputMode,
 		outputStdout)
@@ -177,6 +178,7 @@ func (k *Kibini) compileServiceFilter(services string,
 
 func (k *Kibini) createLogWriters(inputPath string,
 	inputFileNames []string,
+	inputFollow bool,
 	outputPath string,
 	outputMode OutputMode,
 	outputStdout bool) (logWriters map[string][]logWriter, writerWaitGroup *sync.WaitGroup, err error) {
@@ -206,24 +208,25 @@ func (k *Kibini) createLogWriters(inputPath string,
 			}
 		}
 	} else if outputMode == OutputModeSingle {
-
-		// create an output file writer
-		outputFileWriter, err = k.createOutputFileWriter(outputPath)
-		if err != nil {
-			err = k.logger.With(logging.Fields{
-				"outputPath": outputPath,
-			}).Report(err, "Failed to create output file writer")
-			return
-		}
+		writers := []logWriter{}
 
 		// create a formatter/writer which will receive the sorted log records from the merger
-		fileWriter := newLogFormattedWriter(k.logger,
-			newHumanReadableFormatter(false),
-			outputFileWriter)
+		if len(outputPath) != 0 {
 
-		// shove file writer to writers
-		writers := []logWriter{
-			fileWriter,
+			// create an output file writer
+			outputFileWriter, err = k.createOutputFileWriter(outputPath)
+			if err != nil {
+				err = k.logger.With(logging.Fields{
+					"outputPath": outputPath,
+				}).Report(err, "Failed to create output file writer")
+				return
+			}
+
+			fileWriter := newLogFormattedWriter(k.logger,
+				newHumanReadableFormatter(false),
+				outputFileWriter)
+
+			writers = append(writers, fileWriter)
 		}
 
 		// if stdout is requested, create a writer for it
@@ -239,7 +242,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 		// them to log writer
 		logMerger := newLogMerger(k.logger,
 			writerWaitGroup,
-			true,
+			!inputFollow, // if follow, dont stop after first flush
 			time.Second,
 			writers)
 
