@@ -33,7 +33,7 @@ func (hrf *humanReadableFormatter) Format(logRecord *logRecord) string {
 			logRecord.Severity[0],
 			logRecord.What)
 	} else {
-		formatted = fmt.Sprintf("%s%s %30s%s (%s%c%s) %s%s%s: ",
+		formatted = fmt.Sprintf("%s%s %30s%s: (%s%c%s) %s%s%s ",
 			ansi.LightBlack,
 			logRecord.When.Format("020106 15:04:05.000000"),
 			logRecord.rtruncateString(logRecord.Who, 30),

@@ -24,31 +24,36 @@ func (lrs logRecordSorter) Less(i, j int) bool { return lrs[i].WhenUnixNano < lr
 //
 
 type logMerger struct {
-	logger                      logging.Logger
-	waitGroup                   *sync.WaitGroup
-	stopAfterFirstFlush         bool
-	inactivityFlushTimeout      time.Duration
-	writers                     []logWriter
-	incomingRecords             chan *logRecord
-	pendingRecords              logRecordSorter
-	lastPendingRecordReceivedAt time.Time
+	logger                        logging.Logger
+	waitGroup                     *sync.WaitGroup
+	stopAfterFirstFlush           bool
+	inactivityFlushTimeout        time.Duration
+	forceFlushTimeout             time.Duration
+	writers                       []logWriter
+	incomingRecords               chan *logRecord
+	pendingRecords                logRecordSorter
+	newestPendingRecordReceivedAt time.Time
+	oldestPendingRecordReceivedAt time.Time
 }
 
 func newLogMerger(logger logging.Logger,
 	waitGroup *sync.WaitGroup,
 	stopAfterFirstFlush bool,
 	inactivityFlushTimeout time.Duration,
+	forceFlushTimeout time.Duration,
 	writers []logWriter) *logMerger {
 
 	lm := &logMerger{
-		logger:                      logger.GetChild("merger"),
-		waitGroup:                   waitGroup,
-		stopAfterFirstFlush:         stopAfterFirstFlush,
-		inactivityFlushTimeout:      inactivityFlushTimeout,
-		writers:                     writers,
-		incomingRecords:             make(chan *logRecord),
-		pendingRecords:              logRecordSorter{},
-		lastPendingRecordReceivedAt: time.Now(),
+		logger:                        logger.GetChild("merger"),
+		waitGroup:                     waitGroup,
+		stopAfterFirstFlush:           stopAfterFirstFlush,
+		inactivityFlushTimeout:        inactivityFlushTimeout,
+		forceFlushTimeout:             forceFlushTimeout,
+		writers:                       writers,
+		incomingRecords:               make(chan *logRecord),
+		pendingRecords:                logRecordSorter{},
+		newestPendingRecordReceivedAt: time.Now(),
+		oldestPendingRecordReceivedAt: time.Now(),
 	}
 
 	// increment wait group (will be signaled when we're done)
@@ -78,26 +83,28 @@ func (lm *logMerger) processIncomingRecords() {
 
 		// received a new incoming record
 		case incomingRecord := <-lm.incomingRecords:
+			now := time.Now()
+
+			// if we're the first record shoved into the pending records, set the the proper field
+			if len(lm.pendingRecords) == 0 {
+				lm.oldestPendingRecordReceivedAt = now
+			}
 
 			// write it to the pendingRecords
 			lm.pendingRecords = append(lm.pendingRecords, incomingRecord)
 
 			// update the last time we got a record
-			lm.lastPendingRecordReceivedAt = time.Now()
+			lm.newestPendingRecordReceivedAt = now
 
-		// every 1 second, check if we need to flush anything
-		case <-time.After(time.Second):
+			// check if we need to flush
+			lm.checkFlushRequired()
 
-			// check if there are any pending incoming requests and whether
-			// enough time has passed to flush them
-			if lm.pendingRecords.Len() != 0 &&
-				time.Since(lm.lastPendingRecordReceivedAt) > lm.inactivityFlushTimeout {
+		// if nothing arrives in the queue, after 250ms check if flush is required
+		case <-time.After(250 * time.Millisecond):
 
-				// flush the pending records
-				lm.flushPendingRecords()
-
-				// quit if we need to stop after first flush
-				quit = lm.stopAfterFirstFlush
+			// if there are any pending records
+			if lm.pendingRecords.Len() != 0 {
+				quit = lm.checkFlushRequired() && lm.stopAfterFirstFlush
 			}
 		}
 	}
@@ -108,10 +115,25 @@ func (lm *logMerger) processIncomingRecords() {
 	lm.waitGroup.Done()
 }
 
+func (lm *logMerger) checkFlushRequired() bool {
+
+	// and inactivityFlushTimeout seconds passed since we got the newest pending record
+	if time.Since(lm.newestPendingRecordReceivedAt) > lm.inactivityFlushTimeout ||
+
+		// or the oldest pending record is older than the force flush timeout and forceFlushTimeout
+		// is enabled (== non-zero)
+		(lm.forceFlushTimeout != 0 && time.Since(lm.oldestPendingRecordReceivedAt) > lm.forceFlushTimeout) {
+
+		// flush the pending records
+		lm.flushPendingRecords()
+
+		return true
+	}
+
+	return false
+}
+
 func (lm *logMerger) flushPendingRecords() {
-	lm.logger.With(logging.Fields{
-		"numPending": lm.pendingRecords.Len(),
-	}).Debug("Flushing pending records")
 
 	// start by sorting the pending records by time
 	sort.Sort(lm.pendingRecords)

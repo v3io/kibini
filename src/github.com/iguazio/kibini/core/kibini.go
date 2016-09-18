@@ -238,12 +238,16 @@ func (k *Kibini) createLogWriters(inputPath string,
 			writers = append(writers, stdoutWriter)
 		}
 
+		// get timeouts for merger
+		inactivityFlushTimeout, forceFlushTimeout := k.getMergerTimeouts(inputFollow)
+
 		// create a log merger writer that will receive all records, merge them (sorted) and then output
 		// them to log writer
 		logMerger := newLogMerger(k.logger,
 			writerWaitGroup,
 			!inputFollow, // if follow, dont stop after first flush
-			time.Second,
+			inactivityFlushTimeout,
+			forceFlushTimeout,
 			writers)
 
 		// set the log merger as the writer for all input files
@@ -271,4 +275,18 @@ func (k *Kibini) createOutputFileWriter(outputFilePath string) (io.Writer, error
 	}).Debug("Created output file writer")
 
 	return outputFile, nil
+}
+
+func (k *Kibini) getMergerTimeouts(inputFollow bool) (time.Duration, time.Duration) {
+
+	if !inputFollow {
+		// if there's no follow, don't do any force flushing (it'll just waste cycles and may end up with a badly
+		// sorted output). After 1 second of inactivity, assume that all readers finished reading
+		return 1 * time.Second, 0
+
+	} else {
+		// if tail is specified, be more aggressive with checking for silent periods (750ms) and force flush
+		// after 2 seconds
+		return 750 * time.Millisecond, 2 * time.Second
+	}
 }
