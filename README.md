@@ -1,7 +1,7 @@
 Kibini is a logging parser to help us work with platform JSON until we have a UI. I know there are a few tools out there but I wanted one with the following abilities:
 * Easy to install from anywhere - kibini is written in Go and its self contained, install-less binary is deployed on a public S3 bucket
 * Parse multiple log files in one command - kibini parses a full CI run log (> 150K log records across all service logs) in under a second
-* Tailing - kibini can tail files 
+* Tailing - kibini can tail files
 * Combine multiple logs to a single log sorted by time - kibini supports this using a heuristic so that combining tailed logs is also supported
 * Familiar output - kibini outputs an stdout-like log and pretty prints arguments. It also supports colors if you output to stdout
 
@@ -13,6 +13,11 @@ Linux: `wget iguazio-public.s3.amazonaws.com/kibini/linux/kibini`
 OSX: `wget iguazio-public.s3.amazonaws.com/kibini/osx/kibini`
 
 Then make it executable: `chmod +x kibini`
+
+#### Installing an older version
+Same as above, except specify the version prior to kibini. For example, to get v0.0.2 for Linux:
+`wget iguazio-public.s3.amazonaws.com/kibini/linux/v0.0.2/kibini`
+
 
 ## Running
 All these examples assume you're running it in the log directory. You can override paths using `--input-path` and `--output-path`.
