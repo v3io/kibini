@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -27,30 +28,34 @@ func (hrf *humanReadableFormatter) Format(logRecord *logRecord) string {
 
 	if !hrf.color {
 		formatted = fmt.Sprintf("%s %30s (%c) %s ",
-			logRecord.When.Format("020106 15:04:05.000000"),
+			logRecord.When.Format("02.01.06 15:04:05.000000"),
 			logRecord.rtruncateString(logRecord.Who, 30),
 			logRecord.Severity[0],
 			logRecord.What)
 	} else {
-		formatted = fmt.Sprintf("%s%s %30s%s (%s%c%s) %s%s%s ",
+		formatted = fmt.Sprintf("%s%s %30s%s (%s%c%s) %s%s%s: ",
 			ansi.LightBlack,
 			logRecord.When.Format("020106 15:04:05.000000"),
 			logRecord.rtruncateString(logRecord.Who, 30),
 			ansi.Reset,
-			getSeverityColor(severityCode), severityCode, ansi.Reset,
+			hrf.getSeverityColor(severityCode), severityCode, ansi.Reset,
 			ansi.Cyan, logRecord.What, ansi.Reset)
 	}
 
-	if len(logRecord.More) > 150 {
-		formatted += "\n" + logRecord.indentJson(strings.Replace(logRecord.More, "'", "\"", -1)) + "\n"
+	// marshal the string
+	marshalledMore, _ := json.MarshalIndent(logRecord.More, "", "\t")
+
+	// if the string is short, apply some magic to it so that it looks nice
+	if len(marshalledMore) < 150 {
+		formatted += hrf.formatShortMore(marshalledMore)
 	} else {
-		formatted += logRecord.More
+		formatted += strings.Replace(string(marshalledMore), "\\n", "\n", -1)
 	}
 
 	return formatted + "\n"
 }
 
-func getSeverityColor(severityCode byte) string {
+func (hrf *humanReadableFormatter) getSeverityColor(severityCode byte) string {
 	switch string(severityCode) {
 	case "V":
 		return ansi.LightBlue
@@ -61,4 +66,29 @@ func getSeverityColor(severityCode byte) string {
 	}
 
 	return ansi.Reset
+}
+
+func (hrf *humanReadableFormatter) formatShortMore(marshalledMore []byte) string {
+	shortMore := []byte{}
+
+	for idx, c := range marshalledMore {
+
+		// skip newlines
+		if c == '\n' {
+			continue
+
+			// convert tabs to space, except for the first one since we don't want a space
+			// after the curly brackets
+		} else if c == '\t' {
+
+			// delete the first tab, replace the rest with spaces
+			if idx != 2 {
+				shortMore = append(shortMore, ' ')
+			}
+		} else {
+			shortMore = append(shortMore, c)
+		}
+	}
+
+	return string(shortMore)
 }

@@ -10,10 +10,10 @@ type logRecord struct {
 	WhenRaw      string `json:"when"`
 	When         time.Time
 	WhenUnixNano int64
-	Who          string `json:"who"`
-	What         string `json:"what"`
-	Severity     string `json:"severity"`
-	More         string `json:"more"`
+	Who          string                      `json:"who"`
+	What         string                      `json:"what"`
+	Severity     string                      `json:"severity"`
+	More         map[string]*json.RawMessage `json:"more"`
 }
 
 func newLogRecord(unparsedLogRecord string) *logRecord {
