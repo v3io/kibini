@@ -43,7 +43,7 @@ func (hrf *humanReadableFormatter) Format(logRecord *logRecord) string {
 	}
 
 	// marshal the string
-	marshalledMore, _ := json.MarshalIndent(logRecord.More, "", "\t")
+	marshalledMore, _ := json.MarshalIndent(logRecord.More, "", "    ")
 
 	// if the string is short, apply some magic to it so that it looks nice
 	if len(marshalledMore) < 150 {
