@@ -27,6 +27,7 @@ type logMerger struct {
 	logger                        logging.Logger
 	waitGroup                     *sync.WaitGroup
 	stopAfterFirstFlush           bool
+	stopAfterFirstQuietPeriod     bool
 	inactivityFlushTimeout        time.Duration
 	forceFlushTimeout             time.Duration
 	writers                       []logWriter
@@ -39,6 +40,7 @@ type logMerger struct {
 func newLogMerger(logger logging.Logger,
 	waitGroup *sync.WaitGroup,
 	stopAfterFirstFlush bool,
+	stopAfterFirstQuietPeriod bool,
 	inactivityFlushTimeout time.Duration,
 	forceFlushTimeout time.Duration,
 	writers []logWriter) *logMerger {
@@ -47,6 +49,7 @@ func newLogMerger(logger logging.Logger,
 		logger:                        logger.GetChild("merger"),
 		waitGroup:                     waitGroup,
 		stopAfterFirstFlush:           stopAfterFirstFlush,
+		stopAfterFirstQuietPeriod:     stopAfterFirstQuietPeriod,
 		inactivityFlushTimeout:        inactivityFlushTimeout,
 		forceFlushTimeout:             forceFlushTimeout,
 		writers:                       writers,
@@ -105,6 +108,10 @@ func (lm *logMerger) processIncomingRecords() {
 			// if there are any pending records
 			if lm.pendingRecords.Len() != 0 {
 				quit = lm.checkFlushRequired() && lm.stopAfterFirstFlush
+			} else {
+
+				// if we need to stop after the first quiet period, do so
+				quit = lm.stopAfterFirstQuietPeriod
 			}
 		}
 	}

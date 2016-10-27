@@ -245,7 +245,8 @@ func (k *Kibini) createLogWriters(inputPath string,
 		// them to log writer
 		logMerger := newLogMerger(k.logger,
 			writerWaitGroup,
-			!inputFollow, // if follow, dont stop after first flush
+			!inputFollow, // if not following, stop after first flush
+			!inputFollow, // if not following, stop after the first quiet period
 			inactivityFlushTimeout,
 			forceFlushTimeout,
 			writers)

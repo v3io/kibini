@@ -16,8 +16,8 @@ var (
 	appInputPath    = app.Flag("input-path", "Where to look for platform logs").Default(".").String()
 	appInputFollow  = app.Flag("follow", "Tail -f the log files").Short('f').Bool()
 	appOutputPath   = app.Flag("output-path", "Where to output formatted log files").String()
-	appOutputMode   = app.Flag("output-mode", "single: merge all logs; per: one formtatted per input").Default("per").Enum("single", "per")
-	appOutputStdout = app.Flag("stdout", "Output to stdout (output-mode must be 'single'").Bool()
+	appOutputMode   = app.Flag("output-mode", "single: merge all logs; per: one formatted per input").Default("per").Enum("single", "per")
+	appOutputStdout = app.Flag("stdout", "Output to stdout (output-mode must be 'single')").Bool()
 	appServices     = app.Flag("services", "Process only these services").String()
 	appNoServices   = app.Flag("no-services", "Process all but these services").String()
 )
@@ -50,7 +50,7 @@ func augmentArguments() {
 }
 
 func main() {
-	app.Version("v0.0.2")
+	app.Version("v0.0.3")
 
 	// create a logger
 	logger := logging.NewClient("kibini", ".", "kibini.log.txt", true)
