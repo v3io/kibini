@@ -50,7 +50,7 @@ func augmentArguments() {
 }
 
 func main() {
-	app.Version("v0.0.3")
+	app.Version("v0.0.4")
 
 	// create a logger
 	logger := logging.NewClient("kibini", ".", "kibini.log.txt", true)

@@ -14,6 +14,7 @@ type logRecord struct {
 	What         string                      `json:"what"`
 	Severity     string                      `json:"severity"`
 	More         map[string]*json.RawMessage `json:"more"`
+	Ctx          string                      `json:"ctx"`
 }
 
 func newLogRecord(unparsedLogRecord string) *logRecord {

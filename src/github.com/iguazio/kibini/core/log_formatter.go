@@ -42,14 +42,24 @@ func (hrf *humanReadableFormatter) Format(logRecord *logRecord) string {
 			ansi.Cyan, logRecord.What, ansi.Reset)
 	}
 
-	// marshal the string
-	marshalledMore, _ := json.MarshalIndent(logRecord.More, "", "    ")
+	// if there's a context, add it to more as a string in quotations
+	if len(logRecord.Ctx) > 0 {
+		rm := json.RawMessage(fmt.Sprintf("\"%s\"", logRecord.Ctx))
+		logRecord.More["ctx"] = &rm
+	}
 
-	// if the string is short, apply some magic to it so that it looks nice
-	if len(marshalledMore) < 150 {
-		formatted += hrf.formatShortMore(marshalledMore)
+	marshalledMore, err := json.MarshalIndent(logRecord.More, "", "    ")
+
+	if err != nil {
+		formatted += fmt.Sprintf("<Error formatting more: %s>", err)
 	} else {
-		formatted += strings.Replace(string(marshalledMore), "\\n", "\n", -1)
+
+		// if the string is short, apply some magic to it so that it looks nice
+		if len(marshalledMore) < 150 {
+			formatted += hrf.formatShortMore(marshalledMore)
+		} else {
+			formatted += strings.Replace(string(marshalledMore), "\\n", "\n", -1)
+		}
 	}
 
 	return formatted + "\n"
@@ -69,26 +79,12 @@ func (hrf *humanReadableFormatter) getSeverityColor(severityCode byte) string {
 }
 
 func (hrf *humanReadableFormatter) formatShortMore(marshalledMore []byte) string {
-	shortMore := []byte{}
+	result := string(marshalledMore)
 
-	for idx, c := range marshalledMore {
+	// replace newlines and stuff with what was supposed to be a tab
+	result = strings.Replace(result, "\n", "", -1)
+	result = strings.Replace(result, "{    ", "{", -1)
+	result = strings.Replace(result, ",    ", ", ", -1)
 
-		// skip newlines
-		if c == '\n' {
-			continue
-
-			// convert tabs to space, except for the first one since we don't want a space
-			// after the curly brackets
-		} else if c == '\t' {
-
-			// delete the first tab, replace the rest with spaces
-			if idx != 2 {
-				shortMore = append(shortMore, ' ')
-			}
-		} else {
-			shortMore = append(shortMore, c)
-		}
-	}
-
-	return string(shortMore)
+	return result
 }
