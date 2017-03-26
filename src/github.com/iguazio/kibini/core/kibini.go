@@ -49,13 +49,11 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	services string,
 	noServices string,
 	singleFile string) (err error) {
-
 	var inputFileNames []string
-
 
 	if singleFile != "\000" {
 
-		// if user specified one file: verify existence
+		// if the user specified one file: verify existence
 		var fullSingleFilePath = filepath.Join(inputPath, singleFile)
 		if _, err = os.Stat(fullSingleFilePath); err == nil {
 			inputFileNames = append(inputFileNames, singleFile)
@@ -65,7 +63,6 @@ func (k *Kibini) ProcessLogs(inputPath string,
 			fmt.Print(errorString)
 			return
 		}
-
 	} else {
 
 		// else, get the log file names on which we shall work
