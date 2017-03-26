@@ -124,18 +124,6 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	return nil
 }
 
-// Verify a file exists in the directory, print error message if not
-func (k *Kibini) verifyFileExist (inputPath string,
-	singleFile string) (fileExists bool, err error) {
-	var fullSingleFilePath = filepath.Join(inputPath, singleFile)
-	if _, err = os.Stat(fullSingleFilePath); err == nil {
-		fileExists = true
-	} else {
-		fileExists = false
-	}
-	return
-
-}
 func (k *Kibini) getSourceLogFileNames(inputPath string,
 	services string,
 	noServices string) ([]string, error) {
