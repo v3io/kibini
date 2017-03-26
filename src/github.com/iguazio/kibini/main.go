@@ -20,7 +20,7 @@ var (
 	appOutputStdout = app.Flag("stdout", "Output to stdout (output-mode must be 'single')").Bool()
 	appServices     = app.Flag("services", "Process only these services").String()
 	appNoServices   = app.Flag("no-services", "Process all but these services").String()
-	appSingleFile	= app.Flag("filename", "Format only the given filename").Default("\000").String()
+	appSingleFile	= app.Arg("filename", "Format only the given filename").Default("\000").String()
 )
 
 func getOutputMode(outputModeString string) core.OutputMode {
