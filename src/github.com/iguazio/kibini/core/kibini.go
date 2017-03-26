@@ -10,6 +10,7 @@ import (
 	"io"
 	"sync"
 	"time"
+	"fmt"
 )
 
 // whether to include matched services or exclude them
@@ -46,12 +47,32 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	outputMode OutputMode,
 	outputStdout bool,
 	services string,
-	noServices string) (err error) {
+	noServices string,
+	singleFile string) (err error) {
 
-	// get the log file names on which we shall work
-	inputFileNames, err := k.getSourceLogFileNames(inputPath, services, noServices)
-	if err != nil {
-		k.logger.Report(err, "Failed to get filtered log file names")
+	var inputFileNames []string
+
+
+	if singleFile != "\000" {
+
+		// if user specified one file: verify existence
+		var fullSingleFilePath = filepath.Join(inputPath, singleFile)
+		if _, err = os.Stat(fullSingleFilePath); err == nil {
+			inputFileNames = append(inputFileNames, singleFile)
+		} else {
+			var errorString = "Given file not found in directory"
+			k.logger.Report(err, errorString)
+			fmt.Print(errorString)
+			return
+		}
+
+	} else {
+
+		// else, get the log file names on which we shall work
+		inputFileNames, err = k.getSourceLogFileNames(inputPath, services, noServices)
+		if err != nil {
+			k.logger.Report(err, "Failed to get filtered log file names")
+		}
 	}
 
 	// create log writers - for each input file name, a list of writers will be provided
@@ -103,6 +124,18 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	return nil
 }
 
+// Verify a file exists in the directory, print error message if not
+func (k *Kibini) verifyFileExist (inputPath string,
+	singleFile string) (fileExists bool, err error) {
+	var fullSingleFilePath = filepath.Join(inputPath, singleFile)
+	if _, err = os.Stat(fullSingleFilePath); err == nil {
+		fileExists = true
+	} else {
+		fileExists = false
+	}
+	return
+
+}
 func (k *Kibini) getSourceLogFileNames(inputPath string,
 	services string,
 	noServices string) ([]string, error) {
