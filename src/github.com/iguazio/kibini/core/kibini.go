@@ -111,7 +111,8 @@ func (k *Kibini) getSourceLogFileNames(inputPath string,
 	var err error
 
 	// get all log files in log directory
-	unfilteredLogFileNames, err = filepath.Glob(filepath.Join(inputPath, "*.log"))
+	unfilteredLogFileNames, err = k.getLogFilesInDirectory(inputPath)
+
 	if err != nil {
 		return nil, k.logger.Report(err, "Failed to list log directory")
 	}
@@ -145,6 +146,28 @@ func (k *Kibini) getSourceLogFileNames(inputPath string,
 	}
 
 	return filteredLogFileNames, nil
+}
+
+// getLogFilesInDirectory returns all the log files in the given inputPath.
+// a log file is considered a file that ends with '.log' or 'log.<number>'
+func (k *Kibini) getLogFilesInDirectory(inputPath string) (logFiles []string, err error) {
+	var fileNamesInLogDir []string
+	var logFileRegexp *regexp.Regexp
+
+	// get all log files in log directory, first get all the files with 'log' in them
+	fileNamesInLogDir, err = filepath.Glob(filepath.Join(inputPath, "*.log*"))
+
+	// now get only files that ends with `.log` or `log.<digits>`
+	logFileRegexp, err = regexp.Compile("^.*\\.(log|log\\.[0-9]+)$")
+
+	for _, fileName := range fileNamesInLogDir {
+		var matched bool
+		matched = logFileRegexp.MatchString(fileName)
+		if matched {
+			logFiles = append(logFiles, fileName)
+		}
+	}
+	return
 }
 
 func (k *Kibini) compileServiceFilter(services string,
