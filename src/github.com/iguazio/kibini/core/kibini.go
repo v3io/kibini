@@ -161,8 +161,7 @@ func (k *Kibini) getLogFilesInDirectory(inputPath string) (logFiles []string, er
 	logFileRegexp, err = regexp.Compile("^.*\\.(log|log\\.[0-9]+)$")
 
 	for _, fileName := range fileNamesInLogDir {
-		var matched bool
-		matched = logFileRegexp.MatchString(fileName)
+		matched := logFileRegexp.MatchString(fileName)
 		if matched {
 			logFiles = append(logFiles, fileName)
 		}
