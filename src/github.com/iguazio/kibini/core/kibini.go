@@ -10,6 +10,7 @@ import (
 	"io"
 	"sync"
 	"time"
+	"github.com/andrew-d/go-termutil"
 )
 
 // whether to include matched services or exclude them
@@ -46,7 +47,8 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	outputMode OutputMode,
 	outputStdout bool,
 	services string,
-	noServices string) (err error) {
+	noServices string,
+	colorSetting string) (err error) {
 
 	// get the log file names on which we shall work
 	inputFileNames, err := k.getSourceLogFileNames(inputPath, services, noServices)
@@ -60,7 +62,8 @@ func (k *Kibini) ProcessLogs(inputPath string,
 		inputFollow,
 		outputPath,
 		outputMode,
-		outputStdout)
+		outputStdout,
+		colorSetting)
 	if err != nil {
 		k.logger.Report(err, "Failed to create log writers")
 	}
@@ -181,11 +184,13 @@ func (k *Kibini) createLogWriters(inputPath string,
 	inputFollow bool,
 	outputPath string,
 	outputMode OutputMode,
-	outputStdout bool) (logWriters map[string][]logWriter, writerWaitGroup *sync.WaitGroup, err error) {
+	outputStdout bool,
+	colorSetting string) (logWriters map[string][]logWriter, writerWaitGroup *sync.WaitGroup, err error) {
 
 	var outputFileWriter io.Writer
 	writerWaitGroup = new(sync.WaitGroup)
 	logWriters = map[string][]logWriter{}
+	color := k.determineColorSetting(colorSetting, outputStdout)
 
 	if outputMode == OutputModePer {
 
@@ -202,14 +207,13 @@ func (k *Kibini) createLogWriters(inputPath string,
 			}
 
 			// create a single formatter/writer for this input file
-			humanReadableFormatter := newHumanReadableFormatter(false)
+			humanReadableFormatter := newHumanReadableFormatter(color)
 			logWriters[inputFileName] = []logWriter{
 				newLogFormattedWriter(k.logger, humanReadableFormatter, outputFileWriter),
 			}
 		}
 	} else if outputMode == OutputModeSingle {
 		writers := []logWriter{}
-
 		// create a formatter/writer which will receive the sorted log records from the merger
 		if len(outputPath) != 0 {
 
@@ -223,7 +227,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 			}
 
 			fileWriter := newLogFormattedWriter(k.logger,
-				newHumanReadableFormatter(false),
+				newHumanReadableFormatter(color),
 				outputFileWriter)
 
 			writers = append(writers, fileWriter)
@@ -232,7 +236,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 		// if stdout is requested, create a writer for it
 		if outputStdout {
 			stdoutWriter := newLogFormattedWriter(k.logger,
-				newHumanReadableFormatter(true),
+				newHumanReadableFormatter(color),
 				os.Stdout)
 
 			writers = append(writers, stdoutWriter)
@@ -290,4 +294,17 @@ func (k *Kibini) getMergerTimeouts(inputFollow bool) (time.Duration, time.Durati
 		// after 2 seconds
 		return 750 * time.Millisecond, 2 * time.Second
 	}
+}
+
+// determine weather to use colors according to user color setting arg and output format:
+// If user setting is "always", use colors.
+// Else, use color if: we are outputting to stdout AND stdout is a tty AND user setting is not "off"
+func (k *Kibini) determineColorSetting(colorSetting string, stdout bool) (color bool) {
+	color = false
+	if colorSetting == "always" {
+		color = true
+	} else if stdout && colorSetting != "off" && termutil.Isatty(os.Stdout.Fd()) {
+		color = true
+	}
+	return
 }

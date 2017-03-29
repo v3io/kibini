@@ -20,6 +20,7 @@ var (
 	appOutputStdout = app.Flag("stdout", "Output to stdout (output-mode must be 'single')").Bool()
 	appServices     = app.Flag("services", "Process only these services").String()
 	appNoServices   = app.Flag("no-services", "Process all but these services").String()
+	appColorSetting	= app.Flag("color", "on: use colors when outputting to tty; off: don't use colors; always: always use color").Default("on").Enum("on", "off", "always")
 )
 
 func getOutputMode(outputModeString string) core.OutputMode {
@@ -79,7 +80,8 @@ func main() {
 		getOutputMode(*appOutputMode),
 		*appOutputStdout,
 		*appServices,
-		*appNoServices)
+		*appNoServices,
+		*appColorSetting)
 
 	if err != nil {
 		os.Exit(1)
