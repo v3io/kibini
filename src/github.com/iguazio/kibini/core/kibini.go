@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 	"github.com/andrew-d/go-termutil"
+	"fmt"
 )
 
 // whether to include matched services or exclude them
@@ -48,12 +49,29 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	outputStdout bool,
 	services string,
 	noServices string,
+	singleFile string,
 	colorSetting string) (err error) {
+	var inputFileNames []string
 
-	// get the log file names on which we shall work
-	inputFileNames, err := k.getSourceLogFileNames(inputPath, services, noServices)
-	if err != nil {
-		k.logger.Report(err, "Failed to get filtered log file names")
+	if singleFile != "\000" {
+
+		// if the user specified one file: verify existence
+		var fullSingleFilePath = filepath.Join(inputPath, singleFile)
+		if _, err = os.Stat(fullSingleFilePath); err == nil {
+			inputFileNames = append(inputFileNames, singleFile)
+		} else {
+			var errorString = "Given file not found in directory"
+			k.logger.Report(err, errorString)
+			fmt.Print(errorString)
+			return
+		}
+	} else {
+
+		// else, get the log file names on which we shall work
+		inputFileNames, err = k.getSourceLogFileNames(inputPath, services, noServices)
+		if err != nil {
+			k.logger.Report(err, "Failed to get filtered log file names")
+		}
 	}
 
 	// create log writers - for each input file name, a list of writers will be provided
@@ -114,7 +132,8 @@ func (k *Kibini) getSourceLogFileNames(inputPath string,
 	var err error
 
 	// get all log files in log directory
-	unfilteredLogFileNames, err = filepath.Glob(filepath.Join(inputPath, "*.log"))
+	unfilteredLogFileNames, err = k.getLogFilesInDirectory(inputPath)
+
 	if err != nil {
 		return nil, k.logger.Report(err, "Failed to list log directory")
 	}
@@ -148,6 +167,27 @@ func (k *Kibini) getSourceLogFileNames(inputPath string,
 	}
 
 	return filteredLogFileNames, nil
+}
+
+// getLogFilesInDirectory returns all the log files in the given inputPath.
+// a log file is considered a file that ends with '.log' or 'log.<number>'
+func (k *Kibini) getLogFilesInDirectory(inputPath string) (logFiles []string, err error) {
+	var fileNamesInLogDir []string
+	var logFileRegexp *regexp.Regexp
+
+	// get all log files in log directory, first get all the files with 'log' in them
+	fileNamesInLogDir, err = filepath.Glob(filepath.Join(inputPath, "*.log*"))
+
+	// now get only files that ends with `.log` or `log.<digits>`
+	logFileRegexp, err = regexp.Compile("^.*\\.(log|log\\.[0-9]+)$")
+
+	for _, fileName := range fileNamesInLogDir {
+		matched := logFileRegexp.MatchString(fileName)
+		if matched {
+			logFiles = append(logFiles, fileName)
+		}
+	}
+	return
 }
 
 func (k *Kibini) compileServiceFilter(services string,
@@ -214,6 +254,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 		}
 	} else if outputMode == OutputModeSingle {
 		writers := []logWriter{}
+
 		// create a formatter/writer which will receive the sorted log records from the merger
 		if len(outputPath) != 0 {
 
