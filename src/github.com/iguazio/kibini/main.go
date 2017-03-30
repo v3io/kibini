@@ -19,7 +19,7 @@ var (
 	appOutputMode   = app.Flag("output-mode", "single: merge all logs; per: one formatted per input").Default("per").Enum("single", "per")
 	appOutputStdout = app.Flag("stdout", "Output to stdout (output-mode must be 'single')").Bool()
 	appRegex        = app.Flag("regex", "Process only log files that match the given regex").String()
-	appNoServices   = app.Flag("no-services", "Process all but these services").String()
+	appNoRegex   	= app.Flag("no-regex", "Process all log files expect those who match the given regex").String()
 )
 
 func getOutputMode(outputModeString string) core.OutputMode {
@@ -79,7 +79,7 @@ func main() {
 		getOutputMode(*appOutputMode),
 		*appOutputStdout,
 		*appRegex,
-		*appNoServices)
+		*appNoRegex)
 
 	if err != nil {
 		os.Exit(1)
