@@ -21,6 +21,7 @@ var (
 	appServices     = app.Flag("services", "Process only these services").String()
 	appNoServices   = app.Flag("no-services", "Process all but these services").String()
 	appSingleFile	= app.Arg("filename", "Format only the given filename").Default("\000").String()
+	appColorSetting	= app.Flag("color", "on: use colors when outputting to tty; off: don't use colors; always: always use color").Default("on").Enum("on", "off", "always")
 )
 
 func getOutputMode(outputModeString string) core.OutputMode {
@@ -81,7 +82,8 @@ func main() {
 		*appOutputStdout,
 		*appServices,
 		*appNoServices,
-		*appSingleFile)
+		*appSingleFile,
+		*appColorSetting)
 
 	if err != nil {
 		os.Exit(1)
