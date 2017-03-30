@@ -20,6 +20,8 @@ var (
 	appOutputStdout = app.Flag("stdout", "Output to stdout (output-mode must be 'single')").Bool()
 	appServices     = app.Flag("services", "Process only these services").String()
 	appNoServices   = app.Flag("no-services", "Process all but these services").String()
+	appSingleFile	= app.Arg("filename", "Format only the given filename").Default("\000").String()
+	appColorSetting	= app.Flag("color", "on: use colors when outputting to tty; off: don't use colors; always: always use color").Default("on").Enum("on", "off", "always")
 	appWhoWidth	= app.Flag("who-width", "Set truncate width for 'who' field, default is 45").Default("45").Int()
 )
 
@@ -51,7 +53,7 @@ func augmentArguments() {
 }
 
 func main() {
-	app.Version("v0.0.4")
+	app.Version("v0.0.5")
 
 	// create a logger
 	logger := logging.NewClient("kibini", ".", "kibini.log.txt", true)
@@ -81,6 +83,8 @@ func main() {
 		*appOutputStdout,
 		*appServices,
 		*appNoServices,
+		*appSingleFile,
+		*appColorSetting,
 		*appWhoWidth)
 
 	if err != nil {

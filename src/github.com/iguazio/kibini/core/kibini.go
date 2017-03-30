@@ -10,6 +10,8 @@ import (
 	"io"
 	"sync"
 	"time"
+	"github.com/andrew-d/go-termutil"
+	"fmt"
 )
 
 // whether to include matched services or exclude them
@@ -47,12 +49,30 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	outputStdout bool,
 	services string,
 	noServices string,
+	singleFile string,
+	colorSetting string,
 	whoWidth int) (err error) {
+	var inputFileNames []string
 
-	// get the log file names on which we shall work
-	inputFileNames, err := k.getSourceLogFileNames(inputPath, services, noServices)
-	if err != nil {
-		k.logger.Report(err, "Failed to get filtered log file names")
+	if singleFile != "\000" {
+
+		// if the user specified one file: verify existence
+		var fullSingleFilePath = filepath.Join(inputPath, singleFile)
+		if _, err = os.Stat(fullSingleFilePath); err == nil {
+			inputFileNames = append(inputFileNames, singleFile)
+		} else {
+			var errorString = "Given file not found in directory"
+			k.logger.Report(err, errorString)
+			fmt.Print(errorString)
+			return
+		}
+	} else {
+
+		// else, get the log file names on which we shall work
+		inputFileNames, err = k.getSourceLogFileNames(inputPath, services, noServices)
+		if err != nil {
+			k.logger.Report(err, "Failed to get filtered log file names")
+		}
 	}
 
 	// create log writers - for each input file name, a list of writers will be provided
@@ -62,6 +82,7 @@ func (k *Kibini) ProcessLogs(inputPath string,
 		outputPath,
 		outputMode,
 		outputStdout,
+		colorSetting,
 		whoWidth)
 	if err != nil {
 		k.logger.Report(err, "Failed to create log writers")
@@ -113,7 +134,8 @@ func (k *Kibini) getSourceLogFileNames(inputPath string,
 	var err error
 
 	// get all log files in log directory
-	unfilteredLogFileNames, err = filepath.Glob(filepath.Join(inputPath, "*.log"))
+	unfilteredLogFileNames, err = k.getLogFilesInDirectory(inputPath)
+
 	if err != nil {
 		return nil, k.logger.Report(err, "Failed to list log directory")
 	}
@@ -147,6 +169,27 @@ func (k *Kibini) getSourceLogFileNames(inputPath string,
 	}
 
 	return filteredLogFileNames, nil
+}
+
+// getLogFilesInDirectory returns all the log files in the given inputPath.
+// a log file is considered a file that ends with '.log' or 'log.<number>'
+func (k *Kibini) getLogFilesInDirectory(inputPath string) (logFiles []string, err error) {
+	var fileNamesInLogDir []string
+	var logFileRegexp *regexp.Regexp
+
+	// get all log files in log directory, first get all the files with 'log' in them
+	fileNamesInLogDir, err = filepath.Glob(filepath.Join(inputPath, "*.log*"))
+
+	// now get only files that ends with `.log` or `log.<digits>`
+	logFileRegexp, err = regexp.Compile("^.*\\.(log|log\\.[0-9]+)$")
+
+	for _, fileName := range fileNamesInLogDir {
+		matched := logFileRegexp.MatchString(fileName)
+		if matched {
+			logFiles = append(logFiles, fileName)
+		}
+	}
+	return
 }
 
 func (k *Kibini) compileServiceFilter(services string,
@@ -184,11 +227,13 @@ func (k *Kibini) createLogWriters(inputPath string,
 	outputPath string,
 	outputMode OutputMode,
 	outputStdout bool,
+	colorSetting string,
 	whoWidth int) (logWriters map[string][]logWriter, writerWaitGroup *sync.WaitGroup, err error) {
 
 	var outputFileWriter io.Writer
 	writerWaitGroup = new(sync.WaitGroup)
 	logWriters = map[string][]logWriter{}
+	color := k.determineColorSetting(colorSetting, outputStdout)
 
 	if outputMode == OutputModePer {
 
@@ -205,7 +250,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 			}
 
 			// create a single formatter/writer for this input file
-			humanReadableFormatter := newHumanReadableFormatter(false, whoWidth)
+			humanReadableFormatter := newHumanReadableFormatter(color, whoWidth)
 			logWriters[inputFileName] = []logWriter{
 				newLogFormattedWriter(k.logger, humanReadableFormatter, outputFileWriter),
 			}
@@ -226,7 +271,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 			}
 
 			fileWriter := newLogFormattedWriter(k.logger,
-				newHumanReadableFormatter(false, whoWidth),
+				newHumanReadableFormatter(color, whoWidth),
 				outputFileWriter)
 
 			writers = append(writers, fileWriter)
@@ -235,7 +280,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 		// if stdout is requested, create a writer for it
 		if outputStdout {
 			stdoutWriter := newLogFormattedWriter(k.logger,
-				newHumanReadableFormatter(true, whoWidth),
+				newHumanReadableFormatter(color, whoWidth),
 				os.Stdout)
 
 			writers = append(writers, stdoutWriter)
@@ -293,4 +338,17 @@ func (k *Kibini) getMergerTimeouts(inputFollow bool) (time.Duration, time.Durati
 		// after 2 seconds
 		return 750 * time.Millisecond, 2 * time.Second
 	}
+}
+
+// determine weather to use colors according to user color setting arg and output format:
+// If user setting is "always", use colors.
+// Else, use color if: we are outputting to stdout AND stdout is a tty AND user setting is not "off"
+func (k *Kibini) determineColorSetting(colorSetting string, stdout bool) (color bool) {
+	color = false
+	if colorSetting == "always" {
+		color = true
+	} else if stdout && colorSetting != "off" && termutil.Isatty(os.Stdout.Fd()) {
+		color = true
+	}
+	return
 }
