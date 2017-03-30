@@ -10,6 +10,8 @@ import (
 	"io"
 	"sync"
 	"time"
+	"github.com/andrew-d/go-termutil"
+	"fmt"
 )
 
 // whether to include matched services or exclude them
@@ -46,12 +48,31 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	outputMode OutputMode,
 	outputStdout bool,
 	userRegex string,
-	userNoRegex string) (err error) {
+	userNoRegex string,
+	singleFile string,
+	colorSetting string,
+	whoWidth int) (err error) {
+	var inputFileNames []string
 
-	// get the log file names on which we shall work
-	inputFileNames, err := k.getSourceLogFileNames(inputPath, userRegex, userNoRegex)
-	if err != nil {
-		k.logger.Report(err, "Failed to get filtered log file names")
+	if singleFile != "\000" {
+
+		// if the user specified one file: verify existence
+		var fullSingleFilePath = filepath.Join(inputPath, singleFile)
+		if _, err = os.Stat(fullSingleFilePath); err == nil {
+			inputFileNames = append(inputFileNames, singleFile)
+		} else {
+			var errorString = "Given file not found in directory"
+			k.logger.Report(err, errorString)
+			fmt.Print(errorString)
+			return
+		}
+	} else {
+
+		// else, get the log file names on which we shall work
+		inputFileNames, err = k.getSourceLogFileNames(inputPath, userRegex, userNoRegex)
+		if err != nil {
+			k.logger.Report(err, "Failed to get filtered log file names")
+		}
 	}
 
 	// create log writers - for each input file name, a list of writers will be provided
@@ -60,7 +81,9 @@ func (k *Kibini) ProcessLogs(inputPath string,
 		inputFollow,
 		outputPath,
 		outputMode,
-		outputStdout)
+		outputStdout,
+		colorSetting,
+		whoWidth)
 	if err != nil {
 		k.logger.Report(err, "Failed to create log writers")
 	}
@@ -203,11 +226,14 @@ func (k *Kibini) createLogWriters(inputPath string,
 	inputFollow bool,
 	outputPath string,
 	outputMode OutputMode,
-	outputStdout bool) (logWriters map[string][]logWriter, writerWaitGroup *sync.WaitGroup, err error) {
+	outputStdout bool,
+	colorSetting string,
+	whoWidth int) (logWriters map[string][]logWriter, writerWaitGroup *sync.WaitGroup, err error) {
 
 	var outputFileWriter io.Writer
 	writerWaitGroup = new(sync.WaitGroup)
 	logWriters = map[string][]logWriter{}
+	color := k.determineColorSetting(colorSetting, outputStdout)
 
 	if outputMode == OutputModePer {
 
@@ -224,7 +250,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 			}
 
 			// create a single formatter/writer for this input file
-			humanReadableFormatter := newHumanReadableFormatter(false)
+			humanReadableFormatter := newHumanReadableFormatter(color, whoWidth)
 			logWriters[inputFileName] = []logWriter{
 				newLogFormattedWriter(k.logger, humanReadableFormatter, outputFileWriter),
 			}
@@ -245,7 +271,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 			}
 
 			fileWriter := newLogFormattedWriter(k.logger,
-				newHumanReadableFormatter(false),
+				newHumanReadableFormatter(color, whoWidth),
 				outputFileWriter)
 
 			writers = append(writers, fileWriter)
@@ -254,7 +280,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 		// if stdout is requested, create a writer for it
 		if outputStdout {
 			stdoutWriter := newLogFormattedWriter(k.logger,
-				newHumanReadableFormatter(true),
+				newHumanReadableFormatter(color, whoWidth),
 				os.Stdout)
 
 			writers = append(writers, stdoutWriter)
@@ -312,4 +338,17 @@ func (k *Kibini) getMergerTimeouts(inputFollow bool) (time.Duration, time.Durati
 		// after 2 seconds
 		return 750 * time.Millisecond, 2 * time.Second
 	}
+}
+
+// determine weather to use colors according to user color setting arg and output format:
+// If user setting is "always", use colors.
+// Else, use color if: we are outputting to stdout AND stdout is a tty AND user setting is not "off"
+func (k *Kibini) determineColorSetting(colorSetting string, stdout bool) (color bool) {
+	color = false
+	if colorSetting == "always" {
+		color = true
+	} else if stdout && colorSetting != "off" && termutil.Isatty(os.Stdout.Fd()) {
+		color = true
+	}
+	return
 }
