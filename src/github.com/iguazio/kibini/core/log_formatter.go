@@ -14,11 +14,13 @@ type logFormatter interface {
 
 type humanReadableFormatter struct {
 	color bool
+	whoWidth int
 }
 
-func newHumanReadableFormatter(color bool) *humanReadableFormatter {
+func newHumanReadableFormatter(color bool, whoWidth int) *humanReadableFormatter {
 	return &humanReadableFormatter{
 		color,
+		whoWidth,
 	}
 }
 
@@ -29,14 +31,14 @@ func (hrf *humanReadableFormatter) Format(logRecord *logRecord) string {
 	if !hrf.color {
 		formatted = fmt.Sprintf("%s %30s (%c) %s ",
 			logRecord.When.Format("02.01.06 15:04:05.000000"),
-			logRecord.rtruncateString(logRecord.Who, 30),
+			logRecord.rtruncateString(logRecord.Who, hrf.whoWidth),
 			logRecord.Severity[0],
 			logRecord.What)
 	} else {
 		formatted = fmt.Sprintf("%s%s %30s%s: (%s%c%s) %s%s%s ",
 			ansi.LightBlack,
 			logRecord.When.Format("020106 15:04:05.000000"),
-			logRecord.rtruncateString(logRecord.Who, 30),
+			logRecord.rtruncateString(logRecord.Who, hrf.whoWidth),
 			ansi.Reset,
 			hrf.getSeverityColor(severityCode), severityCode, ansi.Reset,
 			ansi.Cyan, logRecord.What, ansi.Reset)

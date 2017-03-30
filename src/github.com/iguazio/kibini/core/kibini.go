@@ -50,7 +50,8 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	services string,
 	noServices string,
 	singleFile string,
-	colorSetting string) (err error) {
+	colorSetting string,
+	whoWidth int) (err error) {
 	var inputFileNames []string
 
 	if singleFile != "\000" {
@@ -81,7 +82,8 @@ func (k *Kibini) ProcessLogs(inputPath string,
 		outputPath,
 		outputMode,
 		outputStdout,
-		colorSetting)
+		colorSetting,
+		whoWidth)
 	if err != nil {
 		k.logger.Report(err, "Failed to create log writers")
 	}
@@ -225,7 +227,8 @@ func (k *Kibini) createLogWriters(inputPath string,
 	outputPath string,
 	outputMode OutputMode,
 	outputStdout bool,
-	colorSetting string) (logWriters map[string][]logWriter, writerWaitGroup *sync.WaitGroup, err error) {
+	colorSetting string,
+	whoWidth int) (logWriters map[string][]logWriter, writerWaitGroup *sync.WaitGroup, err error) {
 
 	var outputFileWriter io.Writer
 	writerWaitGroup = new(sync.WaitGroup)
@@ -247,7 +250,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 			}
 
 			// create a single formatter/writer for this input file
-			humanReadableFormatter := newHumanReadableFormatter(color)
+			humanReadableFormatter := newHumanReadableFormatter(color, whoWidth)
 			logWriters[inputFileName] = []logWriter{
 				newLogFormattedWriter(k.logger, humanReadableFormatter, outputFileWriter),
 			}
@@ -268,7 +271,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 			}
 
 			fileWriter := newLogFormattedWriter(k.logger,
-				newHumanReadableFormatter(color),
+				newHumanReadableFormatter(color, whoWidth),
 				outputFileWriter)
 
 			writers = append(writers, fileWriter)
@@ -277,7 +280,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 		// if stdout is requested, create a writer for it
 		if outputStdout {
 			stdoutWriter := newLogFormattedWriter(k.logger,
-				newHumanReadableFormatter(color),
+				newHumanReadableFormatter(color, whoWidth),
 				os.Stdout)
 
 			writers = append(writers, stdoutWriter)
