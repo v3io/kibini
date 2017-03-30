@@ -47,8 +47,8 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	outputPath string,
 	outputMode OutputMode,
 	outputStdout bool,
-	services string,
-	noServices string,
+	userRegex string,
+	userNoRegex string,
 	singleFile string,
 	colorSetting string,
 	whoWidth int) (err error) {
@@ -69,7 +69,7 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	} else {
 
 		// else, get the log file names on which we shall work
-		inputFileNames, err = k.getSourceLogFileNames(inputPath, services, noServices)
+		inputFileNames, err = k.getSourceLogFileNames(inputPath, userRegex, userNoRegex)
 		if err != nil {
 			k.logger.Report(err, "Failed to get filtered log file names")
 		}
@@ -127,8 +127,8 @@ func (k *Kibini) ProcessLogs(inputPath string,
 }
 
 func (k *Kibini) getSourceLogFileNames(inputPath string,
-	services string,
-	noServices string) ([]string, error) {
+	userRegex string,
+	userNoRegex string) ([]string, error) {
 	var filteredLogFileNames []string
 	var unfilteredLogFileNames []string
 	var err error
@@ -141,7 +141,7 @@ func (k *Kibini) getSourceLogFileNames(inputPath string,
 	}
 
 	// compile a match regex and get the mode (include / exclude)
-	compiledServiceFilter, serviceFilterType, err := k.compileServiceFilter(services, noServices)
+	compiledServiceFilter, serviceFilterType, err := k.compileServiceFilter(userRegex, userNoRegex)
 	if err != nil {
 		return nil, k.logger.Report(err, "Failed to compile service filter")
 	}
@@ -192,20 +192,20 @@ func (k *Kibini) getLogFilesInDirectory(inputPath string) (logFiles []string, er
 	return
 }
 
-func (k *Kibini) compileServiceFilter(services string,
-	noServices string) (compiledFilter *regexp.Regexp, filterType serviceFilterType, err error) {
+func (k *Kibini) compileServiceFilter(userRegex string,
+	userNoRegex string) (compiledFilter *regexp.Regexp, filterType serviceFilterType, err error) {
 
 	var filter string
 
-	// can only either do filter by services or filter out certain services, not both at the same time
-	if len(services) != 0 && len(noServices) != 0 {
-		err = errors.New("'services' and 'no-services' are mutually exclusive")
+	// can only either do filter by userRegex or filter out using userNoRegex, not both at the same time
+	if len(userRegex) != 0 && len(userNoRegex) != 0 {
+		err = errors.New("'--regex' and '--no-regex' are mutually exclusive")
 		return
-	} else if len(services) != 0 {
-		filter = services
+	} else if len(userRegex) != 0 {
+		filter = userRegex
 		filterType = serviceFilterInclude
-	} else if len(noServices) != 0 {
-		filter = noServices
+	} else if len(userNoRegex) != 0 {
+		filter = userNoRegex
 		filterType = serviceFilterExclude
 	} else {
 		filterType = serviceFilterNone

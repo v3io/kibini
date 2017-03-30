@@ -18,11 +18,11 @@ var (
 	appOutputPath   = app.Flag("output-path", "Where to output formatted log files").String()
 	appOutputMode   = app.Flag("output-mode", "single: merge all logs; per: one formatted per input").Default("per").Enum("single", "per")
 	appOutputStdout = app.Flag("stdout", "Output to stdout (output-mode must be 'single')").Bool()
-	appServices     = app.Flag("services", "Process only these services").String()
-	appNoServices   = app.Flag("no-services", "Process all but these services").String()
 	appSingleFile	= app.Arg("filename", "Format only the given filename").Default("\000").String()
 	appColorSetting	= app.Flag("color", "on: use colors when outputting to tty; off: don't use colors; always: always use color").Default("on").Enum("on", "off", "always")
 	appWhoWidth	= app.Flag("who-width", "Set truncate width for 'who' field, default is 45").Default("45").Int()
+	appRegex        = app.Flag("regex", "Process only log files that match the given regex").String()
+	appNoRegex   	= app.Flag("no-regex", "Process all log files expect those who match the given regex").String()
 )
 
 func getOutputMode(outputModeString string) core.OutputMode {
@@ -81,8 +81,8 @@ func main() {
 		*appOutputPath,
 		getOutputMode(*appOutputMode),
 		*appOutputStdout,
-		*appServices,
-		*appNoServices,
+		*appRegex,
+		*appNoRegex,
 		*appSingleFile,
 		*appColorSetting,
 		*appWhoWidth)
