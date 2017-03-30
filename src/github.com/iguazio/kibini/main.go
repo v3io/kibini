@@ -20,7 +20,7 @@ var (
 	appOutputStdout = app.Flag("stdout", "Output to stdout (output-mode must be 'single')").Bool()
 	appServices     = app.Flag("services", "Process only these services").String()
 	appNoServices   = app.Flag("no-services", "Process all but these services").String()
-	appWhoWidth	= app.Flag("who-width", "Set warping width for 'who' field, default is 45").Default("45").Int()
+	appWhoWidth	= app.Flag("who-width", "Set truncate width for 'who' field, default is 45").Default("45").Int()
 )
 
 func getOutputMode(outputModeString string) core.OutputMode {
