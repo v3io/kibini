@@ -174,7 +174,7 @@ func (k *Kibini) compileServiceFilter(userRegex string,
 
 	var filter string
 
-	// can only either do filter by userRegex or filter out certain userRegex, not both at the same time
+	// can only either do filter by userRegex or filter out using userNoRegex, not both at the same time
 	if len(userRegex) != 0 && len(userNoRegex) != 0 {
 		err = errors.New("'--regex' and '--no-regex' are mutually exclusive")
 		return
