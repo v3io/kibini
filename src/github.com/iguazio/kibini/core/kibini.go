@@ -46,7 +46,8 @@ func (k *Kibini) ProcessLogs(inputPath string,
 	outputMode OutputMode,
 	outputStdout bool,
 	services string,
-	noServices string) (err error) {
+	noServices string,
+	whoWidth int) (err error) {
 
 	// get the log file names on which we shall work
 	inputFileNames, err := k.getSourceLogFileNames(inputPath, services, noServices)
@@ -60,7 +61,8 @@ func (k *Kibini) ProcessLogs(inputPath string,
 		inputFollow,
 		outputPath,
 		outputMode,
-		outputStdout)
+		outputStdout,
+		whoWidth)
 	if err != nil {
 		k.logger.Report(err, "Failed to create log writers")
 	}
@@ -181,7 +183,8 @@ func (k *Kibini) createLogWriters(inputPath string,
 	inputFollow bool,
 	outputPath string,
 	outputMode OutputMode,
-	outputStdout bool) (logWriters map[string][]logWriter, writerWaitGroup *sync.WaitGroup, err error) {
+	outputStdout bool,
+	whoWidth int) (logWriters map[string][]logWriter, writerWaitGroup *sync.WaitGroup, err error) {
 
 	var outputFileWriter io.Writer
 	writerWaitGroup = new(sync.WaitGroup)
@@ -202,7 +205,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 			}
 
 			// create a single formatter/writer for this input file
-			humanReadableFormatter := newHumanReadableFormatter(false)
+			humanReadableFormatter := newHumanReadableFormatter(false, whoWidth)
 			logWriters[inputFileName] = []logWriter{
 				newLogFormattedWriter(k.logger, humanReadableFormatter, outputFileWriter),
 			}
@@ -223,7 +226,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 			}
 
 			fileWriter := newLogFormattedWriter(k.logger,
-				newHumanReadableFormatter(false),
+				newHumanReadableFormatter(false, whoWidth),
 				outputFileWriter)
 
 			writers = append(writers, fileWriter)
@@ -232,7 +235,7 @@ func (k *Kibini) createLogWriters(inputPath string,
 		// if stdout is requested, create a writer for it
 		if outputStdout {
 			stdoutWriter := newLogFormattedWriter(k.logger,
-				newHumanReadableFormatter(true),
+				newHumanReadableFormatter(true, whoWidth),
 				os.Stdout)
 
 			writers = append(writers, stdoutWriter)
