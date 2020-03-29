@@ -6,7 +6,7 @@ VERSION ?= $(shell git describe --tags --always --long --dirty)
 LINUX_BIN_NAME=$(EXECUTABLE)-linux-$(GOARCH)
 DARWIN_BIN_NAME=$(EXECUTABLE)-darwin-$(GOARCH)
 KIBINI_MAIN=./cmd/kibini/main.go
-GO_BUILD_COMMAND=go build -i -v -installsuffix cgo -ldflags="-s -w -X main.version=$(VERSION)"
+GO_BUILD_COMMAND=go build -i -installsuffix cgo -ldflags="-s -w -X main.version=$(VERSION)"
 
 .PHONY: all lint bin clean
 
