@@ -5,19 +5,10 @@ Kibini is a logging parser to help us work with platform JSON until we have a UI
 * Combine multiple logs to a single log sorted by time - kibini supports this using a heuristic so that combining tailed logs is also supported
 * Familiar output - kibini outputs an stdout-like log and pretty prints arguments. It also supports colors if you output to stdout
 
-## Install
 Kibini's defaults all assume the logs are in `cwd`, so it's best to run it from the log directory. If you want to run it on some transient machine, just download kibini straight the log dir. On long living machines, put it (or symlink it) in /usr/bin/kibini (/usr/local/bin/kibini on OSX) and run it in the log dir.
 
-Linux: `wget iguazio-public.s3.amazonaws.com/kibini/linux/kibini`
-
-OSX: `wget iguazio-public.s3.amazonaws.com/kibini/osx/kibini`
-
-Then make it executable: `chmod +x kibini`
-
-#### Installing an older version
-Same as above, except specify the version prior to kibini. For example, to get v0.0.2 for Linux:
-`wget iguazio-public.s3.amazonaws.com/kibini/linux/v0.0.2/kibini`
-
+## Install
+TBD
 
 ## Running
 All these examples assume you're running it in the log directory. You can override paths using `--input-path` and `--output-path`.
