@@ -25,7 +25,7 @@ jobs:
         run: go mod download
 
       - name: Build
-        run: make bin
+        run: make ${{ matrix.platform }}
 
       - name: Upload
         id: upload-release-asset
