@@ -10,6 +10,8 @@ GO_BUILD_COMMAND=go build -i -installsuffix cgo -ldflags="-s -w -X main.version=
 
 .PHONY: all lint bin clean
 
+all: lint bin  ## Lint and build binaries
+	@echo Done.
 
 linux: $(LINUX_BIN_NAME)  ## Build binary for linux
 
@@ -50,10 +52,8 @@ lint:  ## Lint
 		--exclude="comment on" \
 		--exclude="error should be the last" \
 		--exclude="should have comment" \
-		./pkg/...
-	@echo Done.
-
-all: lint bin  ## Lint and build binaries
+		./pkg/... \
+		./cmd/...
 	@echo Done.
 
 clean:  ## Clean previously built binaries

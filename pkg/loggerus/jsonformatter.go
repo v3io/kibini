@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/nuclio/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -91,9 +92,8 @@ func (f *JSONFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	data["ctx"] = ctx
 
 	serialized, err := json.Marshal(data)
-
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal fields to JSON, %v", err)
+		return nil, errors.Wrap(err, "Failed to marshal fields to JSON")
 	}
 
 	// we append the rune (byte) '\n' rather than the string "\n"
