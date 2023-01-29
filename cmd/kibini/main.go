@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/iguazio/kibini/pkg/kibini"
-	"github.com/iguazio/kibini/pkg/loggerus"
+	"github.com/v3io/kibini/pkg/kibini"
+	"github.com/v3io/kibini/pkg/loggerus"
 
 	"github.com/nuclio/errors"
 	"github.com/sirupsen/logrus"

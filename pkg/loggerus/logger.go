@@ -3,9 +3,10 @@ package loggerus
 import (
 	"context"
 	"fmt"
+	"io"
+
 	"github.com/nuclio/logger"
 	"github.com/sirupsen/logrus"
-	"io"
 )
 
 type Loggerus struct {
@@ -13,7 +14,7 @@ type Loggerus struct {
 	name   string
 }
 
-// Creates a logger pre-configured for commands
+// NewJSONLoggerus Creates a logger pre-configured for commands
 func NewJSONLoggerus(name string, level logrus.Level, output io.Writer) (*Loggerus, error) {
 
 	// default timestamp formatting, and local timezone - defaults
