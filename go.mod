@@ -10,7 +10,7 @@ require (
 	github.com/nuclio/errors v0.0.4
 	github.com/nuclio/logger v0.0.1
 	github.com/sirupsen/logrus v1.9.0
-	golang.org/x/tools v0.5.1-0.20230128195328-e2603688849b
+	golang.org/x/tools v0.5.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 )
 
