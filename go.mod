@@ -9,7 +9,7 @@ require (
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 	github.com/nuclio/errors v0.0.4
 	github.com/nuclio/logger v0.0.1
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.1
 	golang.org/x/tools v0.5.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 )
